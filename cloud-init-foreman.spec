@@ -4,8 +4,8 @@
 %{!?python_sitelib: %global python_sitelib %(%{__python} -c "from distutils.sysconfig import get_python_lib; print(get_python_lib())")}
 
 Name: cloud-init-foreman
-Version: 0.3
-Release: 2%{?dist}
+Version: %{_pkg_version}
+Release: %{_pkg_release}%{?dist}
 Summary: Foreman module for cloudinit
 Group: System Environment/Base
 License: GPL

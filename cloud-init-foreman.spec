@@ -36,8 +36,8 @@ This package contains cloudinit module which registers the host in foreman.
 
 %install
 [ %{buildroot} != / ] && rm -rf %{buildroot}
-mkdir -p %{buildroot}/%{CLOUDINITDIR}/CloudConfig/
-install -m 644 cc_foreman.py %{buildroot}/%{CLOUDINITDIR}/CloudConfig/cc_foreman.py
+mkdir -p %{buildroot}/%{CLOUDINITDIR}/config/
+install -m 644 cc_foreman.py %{buildroot}/%{CLOUDINITDIR}/config/cc_foreman.py
 
 %clean
 [ %{buildroot} != / ] && rm -rf %{buildroot}
@@ -45,10 +45,10 @@ install -m 644 cc_foreman.py %{buildroot}/%{CLOUDINITDIR}/CloudConfig/cc_foreman
 %files
 %defattr(-,root,root,-)
 %dir %{CLOUDINITDIR}
-%dir %{CLOUDINITDIR}/CloudConfig
-%{CLOUDINITDIR}/CloudConfig/cc_foreman.py
-%{CLOUDINITDIR}/CloudConfig/cc_foreman.pyo
-%{CLOUDINITDIR}/CloudConfig/cc_foreman.pyc
+%dir %{CLOUDINITDIR}/config
+%{CLOUDINITDIR}/config/cc_foreman.py
+%{CLOUDINITDIR}/config/cc_foreman.pyo
+%{CLOUDINITDIR}/config/cc_foreman.pyc
 
 %post
 # if "- foreman" is not cloud.cfg already quit silently
@@ -62,6 +62,8 @@ sed -i /etc/cloud/cloud.cfg -e'/^ - foreman/d'
 /bin/true
 
 %changelog
+* Thu Nov 17 2016 Gavin Williams <gavin.williams@weareact.com> 0.4-1
+- Updates to support latest CloudInit
 * Wed Jul 18 2012 Jan van Eldik <Jan.van.Eldik@cern.ch> 0.3-2
 - fixes to build on RHEL5
 * Wed Jul 18 2012 <tkarasek at cern.ch> 0.3-1

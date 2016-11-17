@@ -9,7 +9,7 @@ pkg:
 	tar -czf $(TARBALL) --transform 's,^,${PACKAGE_NAME}-${VERSION}/,'  $(SOURCES)
 
 rpm: pkg
-	rpmbuild --define "_pkg_version ${VERSION}" --define "_pkg_release ${RELEASE}" -ta $(TARBALL)
+	rpmbuild --define "_pkg_version ${VERSION}" --define "_pkg_release ${RELEASE}" -ta $(TARBALL) --clean
 
 clean:
 	rm -rf $(TARBALL)

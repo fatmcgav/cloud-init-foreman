@@ -3,6 +3,7 @@
 #    Copyright (C) 2012 CERN
 #
 #    Author: Tomas Karasek <tomas.karasek@cern.ch>
+#    Modified: Gavin Williams <gavin.williams@weareact.com>
 #
 #    This program is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License version 3, as
@@ -16,20 +17,30 @@
 #    You should have received a copy of the GNU General Public License
 #    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import json
 import base64
+import json
+import os
 import urllib2
 import urllib
 
 from cloudinit import helpers
 from cloudinit import util
 
+def getEnv():
+    env = os.environ
+    # Check if Puppet PC1 directory on PATH
+    if 'puppetlabs' not in env["PATH"]:
+        env["PATH"] = env["PATH"] + ":/opt/puppetlabs/bin"
+    return env
+
 def getFacterFact(factname, outputType=None):
     command = "facter %s" % factname
+
     if outputType:
         command += " %s" % outputType
+
     try:
-        (facter_out, facter_err) = util.subp(command, shell=True)
+        (facter_out, facter_err) = util.subp(command, shell=True, env=getEnv())
         if facter_err:
             raise Exception("facter returned an error when querying for %s: %s" % factname, string)
         output = facter_out.strip()
@@ -48,7 +59,7 @@ class ForemanAdapter:
         log.debug("Got to ForemanAdapter.init")
         facter_os = json.loads(getFacterFact("os", outputType="--json"))['os']
         log.debug("Facter_os is a %s, looks like: %s", type(facter_os), facter_os)
-        fq_os = "%s %s.%s" % (facter_os['name'], facter_os['release']['major'], facter_os['release']['minor'])
+        fq_os = "%s %s" % (facter_os['name'], facter_os['release']['full'])
         log.debug("Fq_os = %s", fq_os)
 
         log.debug("Setting defaults...")
@@ -70,6 +81,54 @@ class ForemanAdapter:
         log.debug("All mandatory fields present")
         self.login = self.user_data.pop("login")
         self.password = self.user_data.pop("password")
+
+    def makeRequest(self, url, data=None, headers={}, request_type="GET", allowed_responses=[], auth=True):
+        log = self.log
+        log.debug("Got to makeRequest for URL: %s. Data = %s, Headers = %s, Allowed_responses = %s" % (url, data, headers, allowed_responses))
+
+        if request_type == 'POST':
+            data = json.dumps(data)
+
+        if request_type == "GET" and data is not None:
+            url_suffix = "?" + urllib.urlencode(data)
+            url = url + url_suffix
+            data = None
+
+        log.debug("Final URL = %s", url)
+
+        req = urllib2.Request(url, data=data, headers=headers)
+        req.get_method = lambda: request_type
+
+        if auth:
+            auth_string = base64.encodestring("%s:%s" % (self.login, self.password))
+            auth_string = auth_string.strip()
+            auth_header = "Basic %s" % auth_string
+
+            # Add header to request
+            req.add_header('Authorization', auth_header)
+
+        try:
+            out = urllib2.urlopen(req)
+        except urllib2.HTTPError as e:
+            if e.code in allowed_responses:
+                log.debug("Response code %s is in allowed_responses list", e.code)
+                return e
+            else:
+                log.warn("Error encountered opening URL '%s': %s", url, e)
+                raise Exception(("Error encountered opening URL '%s': %s" % (url, e)))
+        else:
+            log.debug("Request completed successfully")
+            return out
+
+    def foremanRequest(self, resource, request_type, data=None):
+        log = self.log
+        log.debug("Got to foremanRequest. Resource = %s, request_type = %s, data = %s", resource, request_type, data)
+
+        headers = {"Content-Type": "application/json",
+                   "Accept": "application/json"}
+
+        url = self.user_data['server'] + "/api/" +  resource
+        return json.loads(self.makeRequest(url, data=data, headers=headers, request_type=request_type).read())
 
     def registerToForeman(self):
         log = self.log
@@ -99,46 +158,20 @@ class ForemanAdapter:
         log.info("New host created with ID: %s", newhost_dict["id"])
         return newhost_dict["id"]
 
-    def foremanRequest(self, resource, request_type, data=None):
-        log = self.log
-        log.debug("Got to foremanRequest. Resource = %s, request_type = %s, data = %s", resource, request_type, data)
-        unsupported_types = ["DELETE"]
-        if request_type == 'POST':
-            data = json.dumps(data)
-
-        url_suffix = ""
-        if request_type == "GET" and data is not None:
-            url_suffix = "?" + urllib.urlencode(data)
-        url = self.user_data['server'] + "/api/" +  resource + url_suffix
-        log.debug("Final URL = %s", url)
-
-        if request_type != "POST":
-            data = None
-
-        #print  "[%s]%s" % (request_type, url)
-
-        auth = base64.encodestring("%s:%s" % (self.login, self.password))
-        auth = auth.strip()
-
-        headers = {"Content-Type": "application/json",
-                   "Accept": "application/json",
-                   "Authorization": "Basic %s" % auth}
-        req = urllib2.Request(url=url, data=data, headers=headers)
-
-        if request_type in unsupported_types:
-           req.get_method = lambda: request_type
-
-        out = urllib2.urlopen(req)
-        return json.loads(out.read())
-
     def hostExists(self, hostname):
-        try:
-            self.foremanRequest(resource="hosts/" + hostname,
-                request_type="GET")
-        except urllib2.HTTPError:
+        log = self.log
+        url = "%s/api/hosts/%s" % (self.user_data['server'], hostname)
+        response = self.makeRequest(url, allowed_responses=[200,404])
+        log.debug("Response code = %s, Body looks like: %s" % (response.getcode(), response.read()))
+        if response.getcode() == 200:
+            log.debug("Matching host already exists.")
+            return True
+        elif response.getcode() == 404:
+            log.debug("No matching host found.")
             return False
-        self.log.warn("host %s already exists" % hostname)
-        return True
+        else:
+            log.debug("Unexpected code returned. Raising exception.")
+            raise Exception("Unexpected response received when checking if host exists. Code: %s, Body: %s" % (response.getcode(), response.read()))
 
     def checkForDuplicates(self, host_dict):
         log = self.log
@@ -174,7 +207,7 @@ class ForemanAdapter:
 
         # operatinsystems can't be searched on foreman-side for some reason so
         # we need to list all entries and pick the matching one
-        if fieldname in ["operatingsystem"]:
+        if fieldname in ["hostgroup", "operatingsystem"]:
             #get_data = {"search": ""}
             lookup_key = 'title'
 
@@ -214,28 +247,23 @@ class ForemanAdapter:
         log.debug("Marking host as built")
         url = self.user_data['server'] + "/unattended/built"
         log.debug("Opening URL %s", url)
-        req = urllib2.Request(url=url, data=None)
-        try:
-            out = urllib2.urlopen(req)
-        except URLError as e:
-            log.warn("Error encountered marking host as built: %s", e)
-            raise Exception(("Error encountered marking host as built: %s" % e))
-        else:
-            log.info("Host marked as successfully built.")
+
+        self.makeRequest(url)
+        log.info("Host marked as successfully built.")
 
 def handle(_name, cfg, cloud, log, _args):
     if 'foreman' not in cfg:
         return
-    cloud.distro.install_packages(("facter",))
-    log.debug("Installed facter")
 
     foreman_cfg = cfg['foreman']
+    log.debug("Foreman_cfg looks like: %s", foreman_cfg)
     adapter = ForemanAdapter(log, foreman_cfg)
     log.debug("ForemanAdapter init completed...")
     newhost_id = adapter.registerToForeman()
 
-    if foreman_cfg['runfinish']:
+    if foreman_cfg.get('runfinish', False):
         log.debug("Running Foreman finish script")
         adapter.runForemanFinishScript()
 
     log.info("cc_foreman complete...")
+

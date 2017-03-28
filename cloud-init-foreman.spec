@@ -62,6 +62,8 @@ sed -i /etc/cloud/cloud.cfg -e'/^ - foreman/d'
 /bin/true
 
 %changelog
+* Tue Mar 28 2017 Gavin Williams <gavin.williams@weareact.com> 0.4-2
+- Further updates to support Puppet 4 paths, and improve Foreman handling
 * Thu Nov 17 2016 Gavin Williams <gavin.williams@weareact.com> 0.4-1
 - Updates to support latest CloudInit
 * Wed Jul 18 2012 Jan van Eldik <Jan.van.Eldik@cern.ch> 0.3-2

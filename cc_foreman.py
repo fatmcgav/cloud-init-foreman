@@ -20,6 +20,7 @@
 import base64
 import json
 import os
+import ssl
 import urllib2
 import urllib
 
@@ -108,7 +109,7 @@ class ForemanAdapter:
             req.add_header('Authorization', auth_header)
 
         try:
-            out = urllib2.urlopen(req)
+            out = urllib2.urlopen(req, context=ssl._create_unverified_context())
         except urllib2.HTTPError as e:
             if e.code in allowed_responses:
                 log.debug("Response code %s is in allowed_responses list", e.code)

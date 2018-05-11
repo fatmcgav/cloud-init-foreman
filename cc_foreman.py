@@ -231,10 +231,9 @@ class ForemanAdapter:
         # Get finish script
         url = self.user_data['server'] + "/unattended/finish"
         log.debug("Requesting URL %s", url)
-        req = urllib2.Request(url=url, data=None)
-        out = urllib2.urlopen(req)
-        log.debug("Out looks like: %s", out)
-        finish_script = out.read()
+        response = self.makeRequest(url)
+        log.debug("Response looks like: %s", response)
+        finish_script = response.read()
 
         log.debug("Running finish script")
         try:

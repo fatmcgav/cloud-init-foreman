@@ -1,6 +1,6 @@
 PACKAGE_NAME=cloud-init-foreman
 VERSION=0.4
-RELEASE=2
+RELEASE=3
 TARBALL=$(PACKAGE_NAME)-${VERSION}.tar.gz
 SOURCES=cc_foreman.py cloud-init-foreman.spec
 .PHONY: clean

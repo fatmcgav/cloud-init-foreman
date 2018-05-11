@@ -62,6 +62,9 @@ sed -i /etc/cloud/cloud.cfg -e'/^ - foreman/d'
 /bin/true
 
 %changelog
+* Fri May 11 2018 Gavin Williams <gavin.williams@weareact.com> 0.4-3
+- Updates to disable SSL verification, as default behaviour changed in rhbz#1490392
+- Standardise on using 'makeRequest' for url requests
 * Tue Mar 28 2017 Gavin Williams <gavin.williams@weareact.com> 0.4-2
 - Further updates to support Puppet 4 paths, and improve Foreman handling
 * Thu Nov 17 2016 Gavin Williams <gavin.williams@weareact.com> 0.4-1
